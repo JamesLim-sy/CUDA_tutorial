@@ -13,11 +13,31 @@ __global__ void  primitive_add(float *x, float *y, float *z, size_t num)
     // gridDim.x  : indicates the hotizontal total block  numbers inside  a grid.
     int i   = 0;
     int idx = threadIdx.x + blockIdx.x * blockDim.x;   
-    size_t stride = blockDim.x * gridDim.x;
+    size_t stride = blockDim.x * gridDim.x; 
     for (i = idx; i < num; i += stride){
        z[i] = x[i] + y[i];
     }
 }
+
+__global__ void  share_mem_add(float *x, float *y, float *z, size_t num)
+{
+    // blockIdx.x : indicates the horizontal index in grid.
+    // blockDim.x : indicates the horizontal total thread numbers inside a block.
+    // gridDim.x  : indicates the hotizontal total block  numbers inside  a grid.
+    int i   = 0;
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    size_t stride = blockDim.x * gridDim.x;
+    __shared__ float cache[2][1024];
+
+    cache[0][0] = x[0];
+    cache[1][0] = y[0];
+    for (i = idx; i < num; i += 1024){
+       x[i] += y[i];
+    }
+    __syncthreads();
+    z[0] = x[0];
+}
+
 
 
 int main()
@@ -55,7 +75,8 @@ int main()
     cudaMemcpy((void *)d_x, (void *)x, nByte, cudaMemcpyHostToDevice);
     cudaMemcpy((void *)d_y, (void *)y, nByte, cudaMemcpyHostToDevice);    
     primitive_add <<< gridsize, blocksize >>> (d_x, d_y, d_z, N);
-    
+    //share_mem_add<<< gridsize, blocksize >>> (d_x, d_y, d_z, N);
+
     // To sync the mission accomplishement of GPU
     cudaDeviceSynchronize();  
     cudaMemcpy((void *)z, (void *)d_z, nByte, cudaMemcpyDeviceToHost);
@@ -68,5 +89,5 @@ int main()
     cudaFree(x);
     cudaFree(y);
     cudaFree(z);
-    return 1;
+    return  0;
 }
