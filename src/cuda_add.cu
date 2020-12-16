@@ -48,19 +48,19 @@ __global__ void  grid_stride_add(float *x, float *y, float *z, size_t num)
 
 __global__ void  share_mem_add(float *x, float *y, float *z, size_t num)
 {
-    __shared__ float cache[2][256];
+    // __shared__ float cache[2][256];
+    __shared__ float cache[256];
 
     int s   = 0;
     int tid = threadIdx.x;
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
 
-    cache[0][tid] = x[idx];
-    cache[1][tid] = y[idx];
+    cache[tid] = z[idx];
     for (s = idx; s < num; s += 256){
-        cache[0][s] += cache[1][s];
+        cache[tid] += x[idx] + y[idx];
     }
-    // __syncthreads();
-    z[0] = cache[0][0];
+    __syncthreads();
+    z[idx] = cache[tid];
 }
 
 
@@ -92,7 +92,10 @@ static int rslt_check_func(void   *p_z,
     }
     cout << "\tMax  Err  : " << max_err << "\tFunc Name : " << str;
     cout << "\t TimeSpan : " << timespan << " ms";
-    cout << "\t Bandwidth(GB/s): " << (num * 4 * 3) / timespan / 1e6 << endl;
+    cout << "\t Bandwidth(GB/s): " << (num * sizeof(float) * 3) / timespan / 1e6 << endl;
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
     ret = (fabs(max_err) > 0.1) ? -5 : 0;
     return ret;
 }
@@ -132,7 +135,7 @@ static int analysis_grid_block(void  *p_x,
         memset(z->p_cpu, nByte, 0);
         cudaMemset((void *)z->p_gpu, 0, nByte);
         cudaEventRecord(start);
-        grid_stride_add<<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+        grid_stride_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
         cudaEventRecord(stop);
     }
     ret = rslt_check_func(z, nByte, N, "grid-stride loop", start, stop);
@@ -171,26 +174,38 @@ static int analysis_no_grid_block(void  *p_x,
     cudaMemcpy((void *)(x->p_gpu), (void *)(x->p_cpu), nByte, cudaMemcpyHostToDevice);
     cudaMemcpy((void *)(y->p_gpu), (void *)(y->p_cpu), nByte, cudaMemcpyHostToDevice); 
 
+    // primitive add
     {
-#if 1
         memset(z->p_cpu, nByte, 0);
         cudaMemset((void *)z->p_gpu, 0, nByte);
         cudaEventRecord(start);
         primitive_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
         cudaEventRecord(stop);
         ret = rslt_check_func(z, nByte, N, "primitive_add", start, stop);
-#else
-        memset(z->p_cpu, nByte, 0);
-        cudaMemset((void *)z->p_gpu, 0, nByte);
-        cudaEventRecord(start);
-        share_mem_add<<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
-        cudaEventRecord(stop);
-        ret = rslt_check_func(z, nByte, N, "share_mem_add", start, stop);
-#endif
     }
     CHECK_ERR(ret != 0, ret);
 
     return 0;
+}
+
+
+
+static size_t   align_mem_alloc(float  **addr, 
+                                int      align,
+                                size_t   nByte)
+{
+    int     ret        = (cudaError_t)0;
+    float  *p_dst      = NULL;
+    size_t  mem_length = nByte + align;
+
+    ret   = cudaMalloc((void **)addr, mem_length);
+    CHECK_ERR(ret != 0, -5);
+
+    p_dst = (float *)((size_t)(*addr) + align);
+    CHECK_ERR(p_dst == NULL, -5);
+    
+    *addr = (float *)p_dst;
+    return ret;
 }
 
 
@@ -200,13 +215,14 @@ int main()
     size_t  N = 1<<24;
     size_t  nByte = N * sizeof(float);
     int     ret = (cudaError_t)0;  // which means success
+    mem_pointer  x,y,z;
 
     const size_t block_num_lo = 32;
     const size_t block_num_up = 2048;
     const size_t grid_num_lo = 1024;
     const size_t grid_num_up = 1024<<7; 
-
-    mem_pointer x,y,z;
+    size_t block_num = 0;
+    size_t grid_num  = 0;
 
     x.p_cpu = (float *)malloc(nByte);
     CHECK_ERR(x.p_cpu == NULL, -5);
@@ -217,16 +233,18 @@ int main()
     z.p_cpu = (float *)malloc(nByte);
     CHECK_ERR(z.p_cpu == NULL, -5);
 
+#if 0
     ret = cudaMalloc((void **)&(x.p_gpu), nByte);
     CHECK_ERR(ret != 0, ret);
 
     ret = cudaMalloc((void **)&(y.p_gpu), nByte);
+    cout << y.p_gpu << endl;
     CHECK_ERR(ret != 0, ret);
 
     ret = cudaMalloc((void **)&(z.p_gpu), nByte);
     CHECK_ERR(ret != 0, ret);
     cout << "nByte :" << nByte << endl;
- 
+
     for (j = grid_num_lo; j < grid_num_up ; j <<= 1) {
         cout << "[GRID NUM] : " << j << endl;
         for (i = block_num_lo; i < block_num_up; i <<= 1){  
@@ -246,7 +264,31 @@ int main()
         CHECK_ERR(ret != 0, -5);
         cout << endl;
     }
+#else 
+    const int aligned = 33;
+    int offset = 0;
+    block_num  = 256;
+    grid_num   = 65536;
+    for (i = 0; i < aligned; i++) 
+    {
+        offset = i * sizeof(float);
+        ret = align_mem_alloc(&(x.p_gpu), offset, nByte);
+        CHECK_ERR(ret != 0, ret);
 
+        ret = cudaMalloc((void **)&(y.p_gpu), nByte);
+        CHECK_ERR(ret != 0, ret);
+
+        ret = cudaMalloc((void **)&(z.p_gpu), nByte);
+        CHECK_ERR(ret != 0, ret);
+        
+        cout << "[x.p_gpu]:   " << x.p_gpu;
+        cout << "\t[y.p_gpu]: " << y.p_gpu;
+        cout << "\t[z.p_gpu]: " << z.p_gpu << endl;
+
+        ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte);
+        CHECK_ERR(ret != 0, -5);
+    }
+#endif
     cudaFree(x.p_gpu);
     cudaFree(y.p_gpu);
     cudaFree(z.p_gpu);
