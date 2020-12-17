@@ -1,0 +1,47 @@
+i: 2
+[x.p_gpu]:0x7f58d8000008  [y.p_gpu]:0x7f58d4000000  [z.p_gpu]:0x7f58d0000000  [offset ]:8 	[Max_Err]: 0 [FuncName]: grid-stride loop	[TimeSpan]: 0.250976 ms	[Bwidth(GB/s)]: 802.175
+
+
+CUDA API Statistics:
+
+ Time(%)  Total Time (ns)  Num Calls     Average      Minimum      Maximum            Name         
+ -------  ---------------  ---------  -------------  ----------  -----------  ---------------------
+    81.1      367,427,003          3  122,475,667.7     349,494  366,727,946  cudaMalloc           
+    18.4       83,406,785          3   27,802,261.7  11,624,928   59,709,210  cudaMemcpy           
+     0.3        1,519,220          3      506,406.7      39,337    1,041,077  cudaFree             
+     0.1          294,495          1      294,495.0     294,495      294,495  cudaEventSynchronize 
+     0.0           77,309          1       77,309.0      77,309       77,309  cudaMemset           
+     0.0           53,371          2       26,685.5         954       52,417  cudaEventDestroy     
+     0.0           29,281          1       29,281.0      29,281       29,281  cudaLaunchKernel     
+     0.0           15,610          2        7,805.0       4,156       11,454  cudaEventRecord      
+     0.0           11,458          1       11,458.0      11,458       11,458  cudaDeviceSynchronize
+     0.0            7,920          2        3,960.0         983        6,937  cudaEventCreate      
+
+
+
+CUDA Kernel Statistics:
+
+ Time(%)  Total Time (ns)  Instances   Average   Minimum  Maximum                           Name                         
+ -------  ---------------  ---------  ---------  -------  -------  ------------------------------------------------------
+   100.0          245,824          1  245,824.0  245,824  245,824  grid_stride_add(float*, float*, float*, unsigned long)
+
+
+
+CUDA Memory Operation Statistics (by time):
+
+ Time(%)  Total Time (ns)  Operations    Average      Minimum     Maximum        Operation     
+ -------  ---------------  ----------  ------------  ----------  ----------  ------------------
+    71.3       57,956,693           1  57,956,693.0  57,956,693  57,956,693  [CUDA memcpy DtoH]
+    28.6       23,202,056           2  11,601,028.0  11,414,788  11,787,268  [CUDA memcpy HtoD]
+     0.1           80,512           1      80,512.0      80,512      80,512  [CUDA memset]     
+
+
+
+CUDA Memory Operation Statistics (by size in KiB):
+
+    Total     Operations   Average     Minimum     Maximum        Operation     
+ -----------  ----------  ----------  ----------  ----------  ------------------
+  65,536.000           1  65,536.000  65,536.000  65,536.000  [CUDA memcpy DtoH]
+  65,536.000           1  65,536.000  65,536.000  65,536.000  [CUDA memset]     
+ 131,072.000           2  65,536.000  65,536.000  65,536.000  [CUDA memcpy HtoD]
+
