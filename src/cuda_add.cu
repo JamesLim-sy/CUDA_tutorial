@@ -243,6 +243,7 @@ int main(int argc, char *argv[])
             cudaFree(z.p_gpu);
             break;
         }
+
         case 1: {
             const int aligned = 33;
             int offset = 0;
@@ -271,7 +272,7 @@ int main(int argc, char *argv[])
         
                 cudaFree(x.p_gpu);
                 cudaFree(y.p_gpu);
-                cudaFree(z.p_gpu);
+                cudaFree(z.p_gpu);  //BUG: buffer碎片
             }
             break;
         }
