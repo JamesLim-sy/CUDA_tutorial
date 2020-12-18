@@ -32,7 +32,7 @@ __global__ void  primitive_add(float *x, float *y, float *z, size_t num)
     if (i < num) {
        z[i] = x[i] + y[i];
     }
-    __syncthreads();  
+    // __syncthreads();  
 }
 
 
@@ -152,26 +152,43 @@ static int analysis_grid_block(void  *p_x,
     cudaMemcpy((void *)(x->p_gpu), (void *)(x->p_cpu), nByte, cudaMemcpyHostToDevice);
     cudaMemcpy((void *)(y->p_gpu), (void *)(y->p_cpu), nByte, cudaMemcpyHostToDevice); 
 
-    if (0)
-    {
-        memset(z->p_cpu, nByte, 0);
-        cudaMemset((void *)z->p_gpu, 0, nByte);
-        cudaEventRecord(start);
-        primitive_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
-        cudaEventRecord(stop);
-        ret = rslt_check_func(z, nByte, N, "primitive_add", start, stop);
-    }
-    else
-    {
-        memset(z->p_cpu, nByte, 0);
-        cudaMemset((void *)z->p_gpu, 0, nByte);
-        cudaEventRecord(start);
-        grid_stride_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
-        cudaEventRecord(stop);
-    }
+    // if (0)
+    // {
+    //     memset(z->p_cpu, nByte, 0);
+    //     cudaMemset((void *)z->p_gpu, 0, nByte);
+    //     cudaEventRecord(start);
+    //     primitive_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+    //     cudaEventRecord(stop);
+    //     ret = rslt_check_func(z, nByte, N, "primitive_add", start, stop);
+    // }
+    // else
+    // {
+    //     memset(z->p_cpu, nByte, 0);
+    //     cudaMemset((void *)z->p_gpu, 0, nByte);
+    //     cudaEventRecord(start);
+    //     grid_stride_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+    //     cudaEventRecord(stop);
+    // }
+    // ret = rslt_check_func(z, nByte, N, "grid-stride loop", start, stop);
+    // CHECK_ERR(ret != 0, ret);
 
-    ret = rslt_check_func(z, nByte, N, "grid-stride loop", start, stop);
-    CHECK_ERR(ret != 0, ret);
+    {
+        cublasHandle_t hdl;
+        float alpha = 1.0f;
+        cublasCreate(&hdl);
+        memset(z->p_cpu, nByte, 0);
+        cudaMemset((void *)z->p_gpu, 0, nByte);
+        
+        cudaEventRecord(start);
+        ret  = cublasSaxpy(hdl, N, &alpha, x->p_gpu, 1, y->p_gpu, 1);
+        cudaEventRecord(stop);
+
+        ret = rslt_check_func(y, nByte, N, "cuBlasSaxpy", start, stop);
+        CHECK_ERR(ret != 0, ret);    
+        
+        ret = cublasDestroy(hdl);
+        CHECK_ERR(ret != 0, ret);
+    }
     return 0;
 }
 
@@ -228,7 +245,6 @@ int main(int argc, char *argv[])
                 }
                 cout << endl;
             }
-        
             j = 0;
             for (i = block_num_lo; i < block_num_up; i <<= 1){  
                 j = N / i; 
@@ -238,9 +254,6 @@ int main(int argc, char *argv[])
                 CHECK_ERR(ret != 0, -5);
                 cout << endl;
             }
-            cudaFree(x.p_gpu);
-            cudaFree(y.p_gpu);
-            cudaFree(z.p_gpu);
             break;
         }
 
@@ -269,23 +282,26 @@ int main(int argc, char *argv[])
         
                 ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte);
                 CHECK_ERR(ret != 0, -5);
-        
-                cudaFree(x.p_gpu);
-                cudaFree(y.p_gpu);
-                cudaFree(z.p_gpu);  //BUG: buffer碎片
             }
             break;
         }
         case 2: {
             cublasStatus_t cu_ret = CUBLAS_STATUS_SUCCESS;
-            cublasHandle_t hdl;
-            float alpha = 1.0f;
-            cublasCreate(&hdl);
-            cu_ret = cublasSetVector(N, sizeof((x.p_cpu)[0]), (void *)x.p_cpu, 1, (void *)x.p_gpu, 1);
-            cu_ret = cublasSetVector(N, sizeof((y.p_cpu)[0]), (void *)y.p_cpu, 1, (void *)y.p_gpu, 1);
-            cu_ret = cublasSaxpy(hdl, N, &alpha, x.p_gpu, 1, y.p_gpu, 1);
-            cu_ret = cublasGetVector(N, sizeof((x.p_cpu)[0]), (void *)y.p_gpu, 1, (void *)y.p_cpu, 1);
-            cu_ret = cublasDestroy(hdl);
+            ret = cudaMalloc((void **)&(z.p_gpu), nByte);
+            CHECK_ERR(ret != 0, ret);
+    
+            ret = cudaMalloc((void **)&(y.p_gpu), nByte);
+            CHECK_ERR(ret != 0, ret);
+    
+            ret = cudaMalloc((void **)&(x.p_gpu), nByte);
+            CHECK_ERR(ret != 0, ret);
+
+            ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte);
+            CHECK_ERR(ret != 0, -5);
+            break;
+        }
+        case 3 : {
+
             break;
         }
         default :{
@@ -293,6 +309,10 @@ int main(int argc, char *argv[])
             return -5;
         }
     }
+
+    cudaFree(x.p_gpu);
+    cudaFree(y.p_gpu);
+    cudaFree(z.p_gpu);
     free(x.p_cpu);
     free(y.p_cpu);
     free(z.p_cpu);    
