@@ -22,17 +22,6 @@ typedef struct _mem_pointer_ {
 #endif
 
 
-__global__ void set_value(float *x, float _value, size_t num)
-{
-    int    i    = 0;
-    int    idx  = threadIdx.x + blockIdx.x * blockDim.x;
-    size_t stride = blockDim.x * gridDim.x;
-    for (i = idx; i < num; i += stride ) {
-        x[i] = _value;
-    }
-}
-
-
 __global__ void  primitive_add(float *x, float *y, float *z, size_t num)
 {
     // blockIdx.x : indicates the horizontal index in grid.
@@ -149,7 +138,8 @@ static int  rslt_check_func(void   *p_dst,
                             size_t  num, 
                             char   *str,
                             cudaEvent_t start,
-                            cudaEvent_t stop)
+                            cudaEvent_t stop,
+                            size_t  loop)
 {
     int     ret = 0; 
     float   eps = 1e-5;
@@ -166,14 +156,13 @@ static int  rslt_check_func(void   *p_dst,
         max_err = fmax(max_err, fabs((m_dst->p_cpu)[i] - 30.0));
         if (max_err > eps) {
             cout << "[ERR] value : " << (m_dst->p_cpu)[i];
-            cout << "\t[index] : " << i << endl;
+            cout << "\t[index] : " << i  << "\t[Loop]: " << loop << endl;
             return -10; 
         }
     }
     // cout << "\t[Max_Err]: " << max_err << " [FuncName]: " << str;
     // cout << "\t[TimeSpan]: " << timespan << " ms";
     // cout << "\t[Bwidth(GB/s)]: " << (num * sizeof(float) * 3) / timespan / 1e6 << endl;
-
     ret = (fabs(max_err) > 0.1) ? -5 : 0;
     return ret;
 }
@@ -211,10 +200,9 @@ static int analysis_grid_block(void  *p_x,
     }
     cudaMemcpy((void *)(x->p_gpu), (void *)(x->p_cpu), nByte, cudaMemcpyHostToDevice);
     cudaMemcpy((void *)(y->p_gpu), (void *)(y->p_cpu), nByte, cudaMemcpyHostToDevice); 
-    cudaMemset((void *)(z->p_gpu), 0, nByte);
-    primitive_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N>>4);
+    primitive_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N>>4);  // warm up
 
-    while (loop < 2)
+    while (loop < 1000)
     {
         cudaEventCreate(&start);
         cudaEventCreate( &stop);
@@ -240,28 +228,28 @@ static int analysis_grid_block(void  *p_x,
             }
             case 3 :{
                 cublasCreate(&hdl);
-                set_value <<< grid_num, block_num >>> (y->p_gpu, 20.0, N);
 
                 cudaEventRecord(start);
                 ret  = cublasSaxpy(hdl, N, &alpha, x->p_gpu, 1, y->p_gpu, 1);
                 cudaEventRecord(stop);
                 CHECK_ERR(ret != 0, ret);
-
-                cudaMemcpy((void *)(z->p_gpu), (void *)(y->p_cpu), nByte, cudaMemcpyDeviceToDevice);
+                
+                cudaMemcpy((void *)(z->p_gpu), (void *)(y->p_gpu), nByte, cudaMemcpyDeviceToDevice);
+                cudaMemcpy((void *)(y->p_gpu), (void *)(y->p_cpu), nByte, cudaMemcpyHostToDevice); 
                 cublasDestroy(hdl);
+                break;
             }
             default : {
                 cout << "[ERR]: line :" << __LINE__ << "\t __func__ :" <<  __func__ << endl;
             }
         }
-        ret = rslt_check_func(y, nByte, N, "test", start, stop);
+        ret = rslt_check_func(z, nByte, N, "test", start, stop, loop);
         CHECK_ERR(ret != 0, ret);
 
         cudaEventDestroy(start);
         cudaEventDestroy(stop);    
         loop++;
     }
-
     return 0;
 }
 
@@ -359,23 +347,7 @@ int main(int argc, char *argv[])
             }
             break;
         }
-        case 2:  
-        {
-            ret = cudaMalloc((void **)&(z.p_gpu), nByte);
-            CHECK_ERR(ret != 0, ret);
-            
-            ret = cudaMalloc((void **)&(y.p_gpu), nByte);
-            CHECK_ERR(ret != 0, ret);
-            
-            ret = cudaMalloc((void **)&(x.p_gpu), nByte);
-            CHECK_ERR(ret != 0, ret);
-            
-            ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte, 3);
-            CHECK_ERR(ret != 0, -5);
-            
-            break;
-        }
-        case 3 : {
+        case 2 : {
             block_num  = 256;
             grid_num   = 65536;
             
@@ -390,8 +362,9 @@ int main(int argc, char *argv[])
             cout << "nByte :" << nByte << endl;
 
             ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte, 0);
-            ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte, 1);
-            ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte, 2);
+            ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte, 3);
+            ret = analysis_grid_block(&x, &y, &z, grid_num / 2, block_num, nByte, 1);
+            ret = analysis_grid_block(&x, &y, &z, grid_num / 4, block_num, nByte, 2);
             CHECK_ERR(ret != 0, -5);
             break;
         }
@@ -409,4 +382,3 @@ int main(int argc, char *argv[])
     free(z.p_cpu);    
     return  0;
 }
-
