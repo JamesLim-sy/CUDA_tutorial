@@ -3,6 +3,8 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include "cublas_v2.h"
+#include <cuda_fp16.h>
+
 using namespace std;
 
 typedef struct _mem_pointer_ {
@@ -46,6 +48,11 @@ __global__ void  grid_stride_add(float *x, float *y, float *z, size_t num)
     }
 }
 
+
+
+__device__ float2 operator+(const float2 &a, const float2 &b) {
+    return make_float2(a.x+b.x, a.y+b.y);
+}
 
 __global__ void grid_stride_add_float2(float *p_x, float *p_y, float *p_z, size_t num) 
 {
@@ -182,12 +189,16 @@ static int analysis_grid_block(void  *p_x,
     size_t  N = nByte / sizeof(float); 
     size_t  loop = 0;
     float   alpha = 1.0;
+    const int stream_num  = 4;  
 
     dim3 blocksize(block_num);
     dim3 gridsize(grid_num);
 
     cudaEvent_t start, stop;
     cublasHandle_t hdl;
+    cudaStream_t stream_id[stream_num];
+    size_t stream_size = N / stream_num;
+    size_t stream_byte = stream_size * sizeof(float);
 
     mem_pointer  *x = (mem_pointer *)p_x;
     mem_pointer  *y = (mem_pointer *)p_y;
@@ -202,7 +213,11 @@ static int analysis_grid_block(void  *p_x,
     cudaMemcpy((void *)(y->p_gpu), (void *)(y->p_cpu), nByte, cudaMemcpyHostToDevice); 
     primitive_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N>>4);  // warm up
 
-    while (loop < 1000)
+    for (i = 0; i < stream_num; ++i) {
+        cudaStreamCreate(&stream_id[i]);
+    }
+
+    while (loop < 10)
     {
         cudaEventCreate(&start);
         cudaEventCreate( &stop);
@@ -255,11 +270,92 @@ static int analysis_grid_block(void  *p_x,
 
 
 
+// 多模式状态
+static int analysis_grid_block_2(void  *p_x, 
+                                void  *p_y, 
+                                void  *p_z,
+                                int    grid_num, 
+                                int    block_num, 
+                                size_t nByte,
+                                int    type)
+{
+    int   ret = (cudaError_t)0;  // which means success
+    int     i = 0;
+    size_t  N = nByte / sizeof(float); 
+    size_t  loop = 0;
+    float   alpha = 1.0;
+    const int stream_num  = 4;  
+
+    dim3 blocksize(block_num);
+    dim3 gridsize(grid_num);
+
+    cudaEvent_t start, stop;
+    cublasHandle_t hdl;
+    cudaStream_t stream_id[stream_num];
+    size_t stream_size = N / stream_num;
+    size_t stream_byte = stream_size * sizeof(float);
+
+    mem_pointer  *x = (mem_pointer *)p_x;
+    mem_pointer  *y = (mem_pointer *)p_y;
+    mem_pointer  *z = (mem_pointer *)p_z;
+
+    for (i = 0; i < N; ++i)
+    {
+        x->p_cpu[i] = 10.0f;
+        y->p_cpu[i] = 20.0f;
+    }
+    primitive_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N>>4);  // warm up
+
+    for (i = 0; i < stream_num; ++i) {
+        cudaStreamCreate(&stream_id[i]);
+    }
+
+    while (loop < 10)
+    {
+        cudaEventCreate(&start);
+        cudaEventCreate( &stop);
+        cudaMemset((void *)(z->p_gpu), 0, nByte);
+        switch (type) {
+            case 0 : {
+                cudaMemcpy((void *)(x->p_gpu), (void *)(x->p_cpu), nByte, cudaMemcpyHostToDevice);
+                cudaMemcpy((void *)(y->p_gpu), (void *)(y->p_cpu), nByte, cudaMemcpyHostToDevice); 
+                cudaEventRecord(start);
+                grid_stride_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+                cudaEventRecord(stop);
+                break;
+            }
+            case 1 : {
+                cudaEventRecord(start);
+                for (i = 0; i < stream_num; ++i) {
+                    int offset = i * stream_size;
+                    cudaMemcpyAsync(&(x->p_gpu[offset]), &(x->p_cpu[offset]), stream_byte, cudaMemcpyHostToDevice, stream[i]);
+                    cudaMemcpyAsync(&(y->p_gpu[offset]), &(y->p_cpu[offset]), stream_byte, cudaMemcpyHostToDevice, stream[i]);
+                    grid_stride_add <<<gridsize / stream_num, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+                    cudaMemcpyAsync(&(x->p_cpu[offset]), &(z->p_gpu[offset]), stream_byte, cudaMemcpyHostToDevice, stream[i]);
+                }
+                cudaEventRecord(stop);
+                break;
+            }
+            default : {
+                cout << "[ERR]: line :" << __LINE__ << "\t __func__ :" <<  __func__ << endl;
+            }
+        }
+        ret = rslt_check_func(z, nByte, N, "test", start, stop, loop);
+        CHECK_ERR(ret != 0, ret);
+
+        cudaEventDestroy(start);
+        cudaEventDestroy(stop);    
+        loop++;
+    }
+    return 0;
+}
+
 
 int main(int argc, char *argv[])
 {
     int     ret = (cudaError_t)0;  // which means success
     size_t  N = 1<<24;
+    
     size_t  nByte = N * sizeof(float);
     size_t  block_num = 0;
     size_t  grid_num  = 0;
@@ -270,7 +366,8 @@ int main(int argc, char *argv[])
     const size_t block_num_up = 2048;
     const size_t grid_num_lo  = 1024;
     const size_t grid_num_up  = 1024<<7; 
-    
+    const int    stream_num   = 4;
+
     if (argc > 1) {
         init = atoi(argv[1]);
         cout << "init : " << init << endl;
@@ -362,10 +459,26 @@ int main(int argc, char *argv[])
             cout << "nByte :" << nByte << endl;
 
             ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte, 0);
-            ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte, 3);
             ret = analysis_grid_block(&x, &y, &z, grid_num / 2, block_num, nByte, 1);
             ret = analysis_grid_block(&x, &y, &z, grid_num / 4, block_num, nByte, 2);
+            ret = analysis_grid_block(&x, &y, &z, grid_num, block_num, nByte, 3);
             CHECK_ERR(ret != 0, -5);
+            break;
+        }
+        case 3 : {  // overlap
+            block_num  = 256;
+            grid_num   = 65536;
+            
+            ret = cudaMalloc((void **)&(x.p_gpu), nByte);
+            CHECK_ERR(ret != 0, ret);
+        
+            ret = cudaMalloc((void **)&(y.p_gpu), nByte);
+            CHECK_ERR(ret != 0, ret);
+        
+            ret = cudaMalloc((void **)&(z.p_gpu), nByte);
+            ret = analysis_grid_block_2(&x, &y, &z, grid_num, block_num, nByte, 0);
+            ret = analysis_grid_block_2(&x, &y, &z, grid_num, block_num, nByte, 4);
+            CHECK_ERR(ret != 0, ret);
             break;
         }
         default :{

@@ -1,0 +1,30 @@
+init : 3
+nByte :67108864
+==7122== Profiling application: ./element_add 3
+==7122== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   98.41%  48.3793s      3000  16.126ms  12.808ms  53.816ms  [CUDA memcpy DtoH]
+                    0.50%  243.56ms      1000  243.56us  242.69us  244.70us  grid_stride_add(float*, float*, float*, unsigned long)
+                    0.49%  240.26ms      1000  240.26us  239.65us  241.06us  grid_stride_add_float2(float*, float*, float*, unsigned long)
+                    0.49%  238.48ms      1000  238.48us  237.82us  239.42us  grid_stride_add_float4(float*, float*, float*, unsigned long)
+                    0.11%  52.972ms         6  8.8287ms  8.0969ms  10.250ms  [CUDA memcpy HtoD]
+                    0.01%  5.0472ms      3003  1.6800us  1.6310us  7.4240us  [CUDA memset]
+                    0.00%  216.35us         3  72.116us  36.159us  117.09us  primitive_add(float*, float*, float*, unsigned long)
+      API calls:   98.51%  50.6136s      3006  16.838ms  8.1926ms  55.842ms  cudaMemcpy
+                    0.82%  420.93ms         3  140.31ms  345.40us  420.22ms  cudaMalloc
+                    0.30%  152.27ms      3003  50.705us  9.4970us  260.52us  cudaMemset
+                    0.09%  47.925ms      3003  15.958us  12.638us  162.14us  cudaLaunchKernel
+                    0.07%  33.482ms      6000  5.5800us  2.9640us  630.99us  cudaEventRecord
+                    0.05%  27.180ms      6000  4.5300us     790ns  70.902us  cudaEventDestroy
+                    0.04%  19.496ms       776  25.123us     329ns  4.9441ms  cuDeviceGetAttribute
+                    0.03%  17.405ms      3000  5.8010us  4.6360us  38.480us  cudaEventElapsedTime
+                    0.03%  16.844ms      6000  2.8070us     710ns  29.126us  cudaEventCreate
+                    0.03%  16.722ms      3000  5.5740us  3.9710us  29.218us  cudaEventSynchronize
+                    0.01%  7.5211ms         8  940.14us  516.43us  1.1346ms  cuDeviceTotalMem
+                    0.01%  3.5817ms         3  1.1939ms  350.46us  2.2440ms  cudaFree
+                    0.00%  1.7766ms         8  222.07us  95.081us  1.0955ms  cuDeviceGetName
+                    0.00%  30.597us         8  3.8240us  1.8670us  11.997us  cuDeviceGetPCIBusId
+                    0.00%  8.4750us        16     529ns     354ns     841ns  cuDeviceGet
+                    0.00%  5.2470us         8     655ns     499ns     949ns  cuDeviceGetUuid
+                    0.00%  1.9710us         3     657ns     329ns  1.1470us  cuDeviceGetCount
+
