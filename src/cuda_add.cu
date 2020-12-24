@@ -155,9 +155,9 @@ static int  rslt_check_func(void   *p_dst,
     mem_pointer *m_dst = (mem_pointer *)p_dst;
 
     // To sync the mission accomplishement of GPU
-    cudaMemcpy((void *)(m_dst->p_cpu), (void *)(m_dst->p_gpu), nByte, cudaMemcpyDeviceToHost);
     cudaEventSynchronize(stop);  
     cudaEventElapsedTime(&timespan, start, stop);
+    cudaMemcpy((void *)(m_dst->p_cpu), (void *)(m_dst->p_gpu), nByte, cudaMemcpyDeviceToHost);
 
     for (int i = 0; i< num; ++i){
         max_err = fmax(max_err, fabs((m_dst->p_cpu)[i] - 30.0));
@@ -167,9 +167,9 @@ static int  rslt_check_func(void   *p_dst,
             return -10; 
         }
     }
-    // cout << "\t[Max_Err]: " << max_err << " [FuncName]: " << str;
-    // cout << "\t[TimeSpan]: " << timespan << " ms";
-    // cout << "\t[Bwidth(GB/s)]: " << (num * sizeof(float) * 3) / timespan / 1e6 << endl;
+    cout << "\t[Max_Err]: " << max_err << " [FuncName]: " << str;
+    cout << "\t[TimeSpan]: " << timespan << " ms";
+    cout << "\t[Bwidth(GB/s)]: " << (num * sizeof(float) * 3) / timespan / 1e6 << endl;
     ret = (fabs(max_err) > 0.1) ? -5 : 0;
     return ret;
 }
@@ -317,21 +317,26 @@ static int analysis_grid_block_2(void  *p_x,
         cudaMemset((void *)(z->p_gpu), 0, nByte);
         switch (type) {
             case 0 : {
+                cudaEventRecord(start);
                 cudaMemcpy((void *)(x->p_gpu), (void *)(x->p_cpu), nByte, cudaMemcpyHostToDevice);
                 cudaMemcpy((void *)(y->p_gpu), (void *)(y->p_cpu), nByte, cudaMemcpyHostToDevice); 
-                cudaEventRecord(start);
-                grid_stride_add <<< gridsize, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+                grid_stride_add <<< grid_num, block_num >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+                cudaMemcpy((void *)(z->p_cpu), (void *)(z->p_gpu), nByte, cudaMemcpyDeviceToHost);
                 cudaEventRecord(stop);
                 break;
             }
             case 1 : {
+                int grid_size = grid_num / stream_num; 
                 cudaEventRecord(start);
                 for (i = 0; i < stream_num; ++i) {
                     int offset = i * stream_size;
-                    cudaMemcpyAsync(&(x->p_gpu[offset]), &(x->p_cpu[offset]), stream_byte, cudaMemcpyHostToDevice, stream[i]);
-                    cudaMemcpyAsync(&(y->p_gpu[offset]), &(y->p_cpu[offset]), stream_byte, cudaMemcpyHostToDevice, stream[i]);
-                    grid_stride_add <<<gridsize / stream_num, blocksize >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
-                    cudaMemcpyAsync(&(x->p_cpu[offset]), &(z->p_gpu[offset]), stream_byte, cudaMemcpyHostToDevice, stream[i]);
+                    cudaMemcpyAsync(&(x->p_gpu[offset]), &(x->p_cpu[offset]), stream_byte, cudaMemcpyHostToDevice, stream_id[i]);
+                    cudaMemcpyAsync(&(y->p_gpu[offset]), &(y->p_cpu[offset]), stream_byte, cudaMemcpyHostToDevice, stream_id[i]);
+                    grid_stride_add <<< grid_size, block_num, 0, stream_id[i] >>> (&(x->p_gpu[offset]), 
+                                                                                   &(y->p_gpu[offset]),
+                                                                                   &(z->p_gpu[offset]), 
+                                                                                   stream_size);
+                    cudaMemcpyAsync(&(z->p_cpu[offset]), &(z->p_gpu[offset]), stream_byte, cudaMemcpyHostToDevice, stream_id[i]);
                 }
                 cudaEventRecord(stop);
                 break;
@@ -477,7 +482,8 @@ int main(int argc, char *argv[])
         
             ret = cudaMalloc((void **)&(z.p_gpu), nByte);
             ret = analysis_grid_block_2(&x, &y, &z, grid_num, block_num, nByte, 0);
-            ret = analysis_grid_block_2(&x, &y, &z, grid_num, block_num, nByte, 4);
+            cout << "-------------- Slice --------------------" << endl;
+            ret = analysis_grid_block_2(&x, &y, &z, grid_num, block_num, nByte, 1);
             CHECK_ERR(ret != 0, ret);
             break;
         }
