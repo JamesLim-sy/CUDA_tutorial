@@ -1,9 +1,0 @@
-nsys profile -o ./x_offset/x_offset_0  --stats=true -t cuda   ./element_add  0  > ./x_offset/x_0.log
-nsys profile -o ./x_offset/x_offset_4  --stats=true -t cuda   ./element_add  1  > ./x_offset/x_1.log
-nsys profile -o ./x_offset/x_offset_8  --stats=true -t cuda   ./element_add  2  > ./x_offset/x_2.log
-nsys profile -o ./x_offset/x_offset_12  --stats=true -t cuda  ./element_add  3  > ./x_offset/x_3.log
-nsys profile -o ./x_offset/x_offset_16  --stats=true -t cuda  ./element_add  4  > ./x_offset/x_4.log
-nsys profile -o ./x_offset/x_offset_20  --stats=true -t cuda  ./element_add  5  > ./x_offset/x_5.log
-nsys profile -o ./x_offset/x_offset_24  --stats=true -t cuda  ./element_add  6  > ./x_offset/x_6.log
-nsys profile -o ./x_offset/x_offset_28  --stats=true -t cuda  ./element_add  7  > ./x_offset/x_7.log
-nsys profile -o ./x_offset/x_offset_32  --stats=true -t cuda  ./element_add  8  > ./x_offset/x_8.log

@@ -1,64 +1,34 @@
 #USER SPECIFIC DIRECTORIES ##
 # CUDA directory:
-CUDA_ROOT_DIR=/home/baidu/personal-code/CUDA_homework/
+CUDA_ROOT_DIR=/home/baidu/personal-code/CUDA_homework
 ##########################################################
-
-## CC COMPILER OPTIONS ##
-
-# CC compiler options:
-CC=g++
-CC_FLAGS=
-CC_LIBS=
-
-##########################################################
-
 ## NVCC COMPILER OPTIONS ##
-
-# NVCC compiler options:
-NVCC=nvcc
+NVCC:=nvcc
+TARGET=element_wise
 
 # CUDA library directory:
-CUDA_LIB_DIR= -L $(CUDA_ROOT_DIR)/lib
-# CUDA include directory:
+CUDA_SRC_DIR=  $(CUDA_ROOT_DIR)/src
 CUDA_INC_DIR=  $(CUDA_ROOT_DIR)/inc
-CUDA_BIN_DIR=  $(CUDA_ROOT_DIR)/bin
 
-# CUDA linking libraries:
-CUDA_LINK_LIBS= -lcudart
-
-NVCC_FLAGS= -I$(CUDA_INC_DIR)
-NVCC_LIBS=
+NVCCFLAGS =  -I$(CUDA_INC_DIR)  -arch=sm_70
+LDFLAGS=  -lcublas 
 
 ##########################################################
-
-## Project file structure ##
-# Source file directory:
-CUDA_FILE = $(wildcard *.cu)
-
-# Object file directory:
-OBJ_FILE = $(wildcard *.o)
+CUDA_FILE = $(wildcard  $(CUDA_SRC_DIR)/*.cu )
+OBJ = $(patsubst %.cu, %.o, $(CUDA_FILE) )
 
 ##########################################################
-
-## Make variables ##
-# Target executable name:
-PRJ_NAME = element_wise
-
-# Object files:
-OBJ_PATH = $(CUDA_OBJ_DIR)/*.o 
-
-##########################################################
-
 ## Compile ##
-all : build
+.PHONY: gpu clean
 
-build : gpu
-	$(NVCC)  $(NVCC_FLAGS) -o $(OBJ_FILE)
+gpu :$(TARGET)
 
-gpu:
-	$(NVCC)  $(NVCC_FLAGS)  $(CUDA_FILE)
+$(TARGET) : $(OBJ)
+	$(NVCC) -o $@  $^   $(LDFLAGS)   -arch=sm_70
+	$ echo ">> make success!\n"
 
-# Clean objects in object directory.
-clean:
-	rm $(OBJ_FILE)  $(PRJ_NAME)
+%.o:%.cu
+	$(NVCC) -c $<  -o $@  $(NVCCFLAGS) 
 
+clean: 
+	rm  $(TARGET)  $(OBJ)

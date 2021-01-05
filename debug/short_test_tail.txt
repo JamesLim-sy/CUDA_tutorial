@@ -1,0 +1,12 @@
+[data_num]: 1073741824	[byte_num]: 2147483648
+[x.p_gpu]:0x7faf8c000058   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:88		[AVG]:  27.0813	[MAX]: 27.1296	[MIN]: 27.0378
+[x.p_gpu]:0x7faf8c00005a   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:90		[AVG]:  27.0813	[MAX]: 27.1211	[MIN]: 27.0315
+[x.p_gpu]:0x7faf8c00005c   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:92		[AVG]:  27.079	[MAX]: 27.1241	[MIN]: 27.034
+[x.p_gpu]:0x7faf8c00005e   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:94		[AVG]:  27.0781	[MAX]: 27.1118	[MIN]: 27.0243
+[x.p_gpu]:0x7faf8c000060   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:96		[AVG]:  27.0777	[MAX]: 27.1222	[MIN]: 27.0191
+[x.p_gpu]:0x7faf8c000062   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:98		[AVG]:  27.0836	[MAX]: 27.1204	[MIN]: 27.0292
+[x.p_gpu]:0x7faf8c000064   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:100		[AVG]:  27.0845	[MAX]: 27.1214	[MIN]: 27.0404
+[x.p_gpu]:0x7faf8c000066   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:102		[AVG]:  27.0825	[MAX]: 27.1219	[MIN]: 27.0404
+[x.p_gpu]:0x7faf8c000068   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:104		[AVG]:  27.0818	[MAX]: 27.1314	[MIN]: 27.0302
+[x.p_gpu]:0x7faf8c00006a   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:106		[AVG]:  27.0812	[MAX]: 27.1223	[MIN]: 27.0324
+[x.p_gpu]:0x7faf8c00006c   [y.p_gpu]:0x7fad84000000   [z.p_gpu]:0x7fae88000000   [offset ]:108		[AVG]:  27.0791	[MAX]: 27.1273	[MIN]: 27.0202
