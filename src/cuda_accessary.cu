@@ -172,6 +172,7 @@ int  rslt_check_func(void   *ptr,
     cudaMemcpy((void *)(p_dst->p_cpu), (void *)(p_dst->p_gpu), byte_num, cudaMemcpyDeviceToHost);
     cudaEventSynchronize(stop);  
     cudaEventElapsedTime(&timespan, start, stop);
+    PRINT_DUMP(__half2float(p_dst->p_cpu[0]), "%f");
 
     for (i = 0; i < num; ++i){
         max_err =  __half2float(p_dst->p_cpu[i]) -  __half2float(target);

@@ -60,9 +60,17 @@ int perf_test_for_single_validation(size_t data_num, size_t loop)
     mem_alloc<T>(&y, byte_num);
     mem_alloc<T>(&z, byte_num);
     
-    for (i = 0; i < N; ++i){
-        x.p_cpu[i] = (T)10;
-        y.p_cpu[i] = (T)20;
+    if (typeid(T) == typeid(__half)) {
+        for (i = 0; i < N; ++i){
+            x.p_cpu[i] = __float2half_rn(10.0);
+            y.p_cpu[i] = __float2half_rn(20.0);
+        }
+    }
+    else {
+        for (i = 0; i < N; ++i){
+            x.p_cpu[i] = (T)10;
+            y.p_cpu[i] = (T)20;
+        }
     }
     cudaMemcpy((void *)(x.p_gpu), (void *)(x.p_cpu), byte_num, cudaMemcpyHostToDevice);
     cudaMemcpy((void *)(y.p_gpu), (void *)(y.p_cpu), byte_num, cudaMemcpyHostToDevice);
@@ -116,9 +124,17 @@ int perf_test_with_combination_block_thread(size_t data_num, size_t loop)
     
     cout << "Quantity: " << data_num << "\tbyte_num :" << byte_num << endl;
     
-    for (i = 0; i < N; ++i){
-        x.p_cpu[i] = (T)10;
-        y.p_cpu[i] = (T)20;
+    if (typeid(T) == typeid(__half)) {
+        for (i = 0; i < N; ++i){
+            x.p_cpu[i] = __float2half_rn(10.0);
+            y.p_cpu[i] = __float2half_rn(20.0);
+        }
+    }
+    else {
+        for (i = 0; i < N; ++i){
+            x.p_cpu[i] = (T)10;
+            y.p_cpu[i] = (T)20;
+        }
     }
     cudaMemcpy((void *)(x.p_gpu), (void *)(x.p_cpu), byte_num, cudaMemcpyHostToDevice);
     cudaMemcpy((void *)(y.p_gpu), (void *)(y.p_cpu), byte_num, cudaMemcpyHostToDevice);

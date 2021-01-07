@@ -4,17 +4,6 @@
 #include <cuda_runtime.h>
 #include "../inc/cuda_test.h"
 
-struct half2_float {
-    half2 x;
-    half2 y;
-};
-
-struct half2_double {
-    half2 x;
-    half2 y;
-    half2 w;
-    half2 z;
-};
 
 template<typename T>
 __global__ void  primitive_add(T *x, T *y, T *z, size_t num)
@@ -57,6 +46,19 @@ __global__ void  grid_stride_add_half2(T *x, T *y, T *z, size_t num)
 }
 
 
+struct half2_float {
+    half2 x;
+    half2 y;
+};
+
+struct half2_double {
+    half2 x;
+    half2 y;
+    half2 w;
+    half2 z;
+};
+
+
 template<typename T>
 __global__ void  grid_stride_add_half2_vec2_ld(T *x, T *y, T *z, size_t num)
 {
@@ -80,6 +82,7 @@ __global__ void  grid_stride_add_half2_vec2_ld(T *x, T *y, T *z, size_t num)
         dst_z[i].y = __hadd2(p_x2, p_y2);
     }
 }
+
 
 
 template<typename T>
