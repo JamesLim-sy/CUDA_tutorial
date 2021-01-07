@@ -5,6 +5,7 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
+using namespace std;
 
 #define T int
 #define ALIGNED(val, align_)  ( (val + align_ - 1) & (~(align_ - 1)) )
@@ -15,8 +16,6 @@
         return ret; \
     }\
 }while(0);
-
-using namespace std;
 
 template <typename T>
 __global__ void index_kernel(T *p_index, T *p_input, T *p_output, 
