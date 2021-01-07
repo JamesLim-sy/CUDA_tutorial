@@ -103,7 +103,7 @@ __global__ void  grid_stride_add_half2(T *x, T *y, T *z, size_t num)
 
 
 template<typename T>
-__global__ void  grid_stride_add_half2_vec2_lddddddd(T *x, T *y, T *z, size_t num)
+__global__ void  grid_stride_add_half2_vec2_ld(T *x, T *y, T *z, size_t num)
 {
     int    i      = 0;
     int    idx    = threadIdx.x + blockIdx.x * blockDim.x;   
@@ -119,14 +119,14 @@ __global__ void  grid_stride_add_half2_vec2_lddddddd(T *x, T *y, T *z, size_t nu
     float2 *src_y = (float2 *)z;
     
     for (i = idx; i < loop; i += stride){
-        // p_x1 = src_x[i].x;
-        // p_y1 = src_y[i].x;
-        // p_x2 = src_x[i].y;
-        // p_y2 = src_y[i].y;
+        p_x1 = src_x[i].x;
+        p_y1 = src_y[i].x;
+        p_x2 = src_x[i].y;
+        p_y2 = src_y[i].y;
         
-        // dst_z[i].x = __hadd2(p_x1, p_y1);
-        // dst_z[i].y = __hadd2(p_x2, p_y2);
-        dst_z[i] = src_x[i];
+        dst_z[i].x = __hadd2(p_x1, p_y1);
+        dst_z[i].y = __hadd2(p_x2, p_y2);
+        // dst_z[i] = src_x[i];
     }
 }
 
@@ -266,7 +266,7 @@ int analysis_grid_block(void  *p_x,
             }
             case 2 : {
                 cudaEventRecord(start);
-                grid_stride_add_half2_vec2_lddddddd <<< (p_gb->grid_num >> 2), p_gb->block_num >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+                grid_stride_add_half2_vec2_ld <<< (p_gb->grid_num >> 2), p_gb->block_num >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
                 cudaEventRecord(stop);
                 break;
             }
@@ -448,10 +448,10 @@ int main(int argc, char *argv[])
     N = 1<<offset;
 
     // case1 : Perf_test with combination block thread
-    // ret = perf_test_with_combination_block_thread<DATA_TYPE>(N, 100);
+    ret = perf_test_with_combination_block_thread<DATA_TYPE>(N, 5);
 
     // case2 : Perf_test with memory offset
-    ret = perf_test_with_mem_addr<DATA_TYPE>(N, 100);
+    // ret = perf_test_with_mem_addr<DATA_TYPE>(N, 100);
 
     return 0;
 }
