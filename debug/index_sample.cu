@@ -8,7 +8,7 @@
 using namespace std;
 
 #define _DEBUG_ 1
-#define T       double  
+#define T       int  
 #define IndexT  int
 
 #define CHECK_ERR(condi, val)  do{ \
@@ -30,38 +30,39 @@ using namespace std;
     std::cout<< std::endl;\
 }while(0);
 
-
+#define BLOCK_DIM_FINDER(val) do
 
 template <typename T_, typename IndexT_=int >
-__global__ void index_kernel_1(IndexT_ *p_index, T_ *p_input, T_ *p_output, 
+__global__ void index_kernel_1(IndexT_ *p_index, T_ *p_value, T_ *p_output, 
                                size_t pitch_idx,
-                               size_t pitch_src, 
+                               size_t pitch_val, 
                                size_t width_index, 
                                size_t height_index) { 
     int   ix = blockDim.x * blockIdx.x + threadIdx.x;
     int   iy = blockDim.y * blockIdx.y + threadIdx.y;
     int   tid    = iy * pitch_idx + ix;
-    int   tid_x  = iy * pitch_src + ix;
+    int   tid_x  = iy * pitch_val + ix;
     int   tid_y  = iy * width_index + ix;
 
     if (ix < width_index & iy < height_index)  {
         IndexT_ idx     = p_index[tid];
-        p_output[tid_y] = p_input[tid_x - ix + idx];
-        #if _DEBUG_
-        printf("tid : %d \t tid_y : %d \tp_index : %d \tp_input : %d \t p_output : %d\n",
-                tid, tid_y, p_index[tid], p_input[tid_x - ix + idx], p_output[tid_y]);
-        #endif
+        p_output[tid_y] = p_value[tid_x - ix + idx];
+#if _DEBUG_
+        printf("tid : %d \ttid_x : %d \ttid_y : %d \tp_index : %d\t"
+               "p_value : %d \tp_output : %d\n",
+               tid, tid_x, tid_y, tid_x - ix + idx,
+               p_value[tid_x - ix + idx], p_output[tid_y]);
+            //    p_value[tid_x], p_output[tid_y]);
+#endif
     }
 }
 
-template <typename T_, typename IndexT_=int >
-__global__ void index_kernel_2(IndexT_ *p_index, T_ *p_input, T_ *p_output);
 
 
-int main()
+int main(int argc, char *argv[])
 {
     int  height = 2;
-    int  width_value = 100;
+    int  width_value = 32;
     int  width_index = 16;
     
     cudaStream_t stream_id;
@@ -92,6 +93,11 @@ int main()
     cudaStreamCreate(&stream_id);
 
     int  test_case = 1;
+    if (argc > 1) {
+        test_case = atoi(argv[1]);
+    }
+    cout << test_case << endl;
+    
     switch (test_case) {
         case 1: {   // 2D  index sample, while 
             ret = cudaMallocPitch(
@@ -126,11 +132,7 @@ int main()
                 cudaMemcpyDeviceToHost, stream_id);
             CHECK_ERR(ret != (cudaError_t)0, ret);
         }
-        case 2 : {  
-            std::vector<T>       vec_value(height * width_value);
-            std::vector<T>      vec_output(height * width_index);
-            std::vector<IndexT>  vec_index(height * width_index);
-            std::vector<T>         vec_dst(height * width_index);    
+        case 2 : {
             ret = cudaMalloc((void**)&g_index , height * byte_index);
             ret = cudaMalloc((void**)&g_value , height * byte_value);
             ret = cudaMalloc((void**)&g_output, height * byte_output);       
@@ -138,12 +140,18 @@ int main()
                             height * byte_index, cudaMemcpyHostToDevice, stream_id);
             cudaMemcpyAsync((void *)g_value, static_cast<void*>(vec_value.data()),
                             height * byte_value, cudaMemcpyHostToDevice, stream_id);
-
-            int  block_dim = ;
-            int  grid_dim  = ;
-            index_kernel_2<<< >>>(g_index, g_value, g_output
-                            );                   
-            cudaMemcpyAsync((void *)g_output, static_cast<void*>(vec_output.data()),
+            
+            dim3 block_dim(width_index, width_index);
+            dim3 gird_dim((width_index + block_dim.x - 1) / block_dim.x, 
+                          (height  + block_dim.y - 1) / block_dim.y);
+            
+            index_kernel_1 <<<gird_dim, block_dim, 0, stream_id>>>(
+                                       g_index, g_value, g_output,
+                                       width_index, 
+                                       width_value, 
+                                       width_index,
+                                       height);           
+            cudaMemcpyAsync(static_cast<void*>(vec_dst.data()), (void *)g_output,
                             height * byte_output, cudaMemcpyDeviceToHost, stream_id);
         }
     }
