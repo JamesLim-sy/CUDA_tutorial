@@ -22,10 +22,10 @@ int main(int argc, char *argv[])
     // ret = device_test();
 
     // case4 : Perf_test for single_validation 
-    ret = perf_test_for_single_validation<DATA_TYPE>(N, loop);
+    // ret = perf_test_for_single_validation<DATA_TYPE>(N, loop);
 
     // case3 : Perf_test with combination block thread
-    // ret = perf_test_with_combination_block_thread<DATA_TYPE>(N, loop);
+    ret = perf_test_with_combination_block_thread<DATA_TYPE>(N, loop);
 
     // case4 : Perf_test with memory address offset.
     // ret = perf_test_with_mem_addr<DATA_TYPE>(N, loop);

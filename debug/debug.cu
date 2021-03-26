@@ -110,24 +110,24 @@ __global__ void  grid_stride_add_half2_vec2_ld(T *x, T *y, T *z, size_t num)
     size_t stride = blockDim.x  * gridDim.x; 
     size_t loop   = num >> 2;
     
-    __half2 p_x1, p_y1, p_x2, p_y2;
-    // struct half2_float *dst_z = (half2_float *)z;
-    // struct half2_float *src_x = (half2_float *)x;
-    // struct half2_float *src_y = (half2_float *)y;
-    float2 *dst_z = (float2 *)x;
-    float2 *src_x = (float2 *)y;
-    float2 *src_y = (float2 *)z;
+    // __half2 p_x1, p_y1, p_x2, p_y2;
+    // // struct half2_float *dst_z = (half2_float *)z;
+    // // struct half2_float *src_x = (half2_float *)x;
+    // // struct half2_float *src_y = (half2_float *)y;
+    // float2 *dst_z = (float2 *)x;
+    // float2 *src_x = (float2 *)y;
+    // float2 *src_y = (float2 *)z;
     
-    for (i = idx; i < loop; i += stride){
-        p_x1 = src_x[i].x;
-        p_y1 = src_y[i].x;
-        p_x2 = src_x[i].y;
-        p_y2 = src_y[i].y;
+    // for (i = idx; i < loop; i += stride){
+    //     p_x1 = src_x[i].x;
+    //     p_y1 = src_y[i].x;
+    //     p_x2 = src_x[i].y;
+    //     p_y2 = src_y[i].y;
         
-        dst_z[i].x = __hadd2(p_x1, p_y1);
-        dst_z[i].y = __hadd2(p_x2, p_y2);
-        // dst_z[i] = src_x[i];
-    }
+    //     dst_z[i].x = __hadd2(p_x1, p_y1);
+    //     dst_z[i].y = __hadd2(p_x2, p_y2);
+    //     // dst_z[i] = src_x[i];
+    // }
 }
 
 
@@ -209,6 +209,63 @@ __global__ void  grid_stride_add_half2_vec4_float_ld(T *x, T *y, T *z, size_t nu
 }
 
 
+template<typename T>
+__global__ void  grid_stride_add_vec2_float_version2(T *x, T *y, T *z, size_t num)
+{
+    int    i      = 0;
+    int    idx    = threadIdx.x + blockIdx.x * blockDim.x;   
+    size_t stride = blockDim.x  * gridDim.x; 
+    size_t loop   = num >> 2;
+    
+    float2 *src_x = reinterpret_cast<float2 *>(x);
+    float2 *src_y = reinterpret_cast<float2 *>(y);
+    float2 *dst_z = reinterpret_cast<float2 *>(z);
+    float2 x_h4, y_h4, z_h4;
+    
+    for (i = idx; i < loop; i += stride){
+        x_h4 = src_x[i];
+        y_h4 = src_y[i];
+
+        half2 *x_h2 = reinterpret_cast<half2 *>(&x_h4);
+        half2 *y_h2 = reinterpret_cast<half2 *>(&y_h4);
+        half2 *z_h2 = reinterpret_cast<half2 *>(&z_h4);
+        z_h2[0] = __hadd2(x_h2[0], y_h2[0]);
+        z_h2[1] = __hadd2(x_h2[1], y_h2[1]);
+
+        dst_z[i] = z_h4;
+    }
+}
+
+
+
+template<typename T>
+__global__ void  grid_stride_add_vec4_float_version2(T *x, T *y, T *z, size_t num)
+{
+    int    i      = 0;
+    int    idx    = threadIdx.x + blockIdx.x * blockDim.x;   
+    size_t stride = blockDim.x  * gridDim.x; 
+    size_t loop   = num >> 3;
+    
+    float4 *src_x = reinterpret_cast<float4 *>(x);
+    float4 *src_y = reinterpret_cast<float4 *>(y);
+    float4 *dst_z = reinterpret_cast<float4 *>(z);
+    float4 x_h8, y_h8, z_h8;
+    
+    for (i = idx; i < loop; i += stride){
+        x_h8 = src_x[i];
+        y_h8 = src_y[i];
+
+        half2 *x_h2 = reinterpret_cast<half2 *>(&x_h8);
+        half2 *y_h2 = reinterpret_cast<half2 *>(&y_h8);
+        half2 *z_h2 = reinterpret_cast<half2 *>(&z_h8);
+        z_h2[0] = __hadd2( x_h2[0], y_h2[0] );
+        z_h2[1] = __hadd2( x_h2[1], y_h2[1] );
+        z_h2[2] = __hadd2( x_h2[2], y_h2[2] );
+        z_h2[3] = __hadd2( x_h2[3], y_h2[3] );
+
+        dst_z[i] = z_h8;
+    }
+}
 
 
 
@@ -245,7 +302,6 @@ int analysis_grid_block(void  *p_x,
     // }
     // printf("[val] : %f  %f\n", tol1 / N, tol2 / N);
     // cout <<  p_gb->grid_num << "\t" << p_gb->block_num << endl; 
-
     while (j < loop) {
         cudaEventCreate(&start);
         cudaEventCreate( &stop);
@@ -288,13 +344,25 @@ int analysis_grid_block(void  *p_x,
                 cudaEventRecord(stop);
                 break;
             }
+            case 6 : {
+                cudaEventRecord(start);
+                grid_stride_add_vec2_float_version2 <<< (p_gb->grid_num >> 2), p_gb->block_num >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+                cudaEventRecord(stop);
+                break;
+            }
+            case 7 : {
+                cudaEventRecord(start);
+                grid_stride_add_vec4_float_version2 <<< (p_gb->grid_num >> 3), p_gb->block_num >>> (x->p_gpu, y->p_gpu, z->p_gpu, N);
+                cudaEventRecord(stop);
+                break;
+            }
             default : {
                 return -10;
                 break;
             }
         }
-        ret = rslt_check_func<T>(z, byte_num, N, "test", start, stop, loop);
-        CHECK_ERR(ret != 0, ret);
+        // ret = rslt_check_func<T>(z, byte_num, N, "test", start, stop, loop);
+        // CHECK_ERR(ret != 0, ret);
 
         cudaEventDestroy(start);
         cudaEventDestroy(stop); 
@@ -317,7 +385,7 @@ int perf_test_with_combination_block_thread(size_t data_num, int loop)
     int     i = 0, j = 0;
     size_t  byte_num = N * sizeof(T);
     
-    cout << "[data_num]: " << N << "\t[byte_num]: " << byte_num << endl;
+    cout << "[data_num]: " << (N/pow(1024,2)) << "\t[byte_num]: " << byte_num << endl;
 
     mem_pointer<T>x;
     mem_pointer<T>y;
@@ -338,12 +406,14 @@ int perf_test_with_combination_block_thread(size_t data_num, int loop)
     cudaMemcpy((void *)(x.p_gpu), (void *)(x.p_cpu), byte_num, cudaMemcpyHostToDevice);
     cudaMemcpy((void *)(y.p_gpu), (void *)(y.p_cpu), byte_num, cudaMemcpyHostToDevice);
 
-    ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 0);
+    // ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 0);
     ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 1);
-    ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 2);
-    ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 3);
-    ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 4);
-    ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 5);
+    // ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 2);
+    // ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 3);
+    // ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 4);
+    // ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 5);
+    ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 6);
+    ret = analysis_grid_block<T>(&x, &y, &z, &grid_block, N, loop, 7);
     mem_free<T>(&x);
     mem_free<T>(&y);
     mem_free<T>(&z);
@@ -435,7 +505,8 @@ int perf_test_with_mem_addr(size_t data_num, int loop)
 
 
 
-#define DATA_TYPE  char
+#define DATA_TYPE  __half
+
 int main(int argc, char *argv[])
 {
     int offset = 0;
@@ -448,7 +519,7 @@ int main(int argc, char *argv[])
     N = 1<<offset;
 
     // case1 : Perf_test with combination block thread
-    ret = perf_test_with_combination_block_thread<DATA_TYPE>(N, 5);
+    ret = perf_test_with_combination_block_thread<DATA_TYPE>(N, 10000);
 
     // case2 : Perf_test with memory offset
     // ret = perf_test_with_mem_addr<DATA_TYPE>(N, 100);
