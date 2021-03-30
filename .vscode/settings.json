@@ -9,6 +9,7 @@
         "tuple": "cpp",
         "type_traits": "cpp",
         "utility": "cpp",
-        "istream": "cpp"
+        "istream": "cpp",
+        "typeinfo": "cpp"
     }
 }
