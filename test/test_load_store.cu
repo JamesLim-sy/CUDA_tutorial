@@ -1,10 +1,8 @@
 #include <iostream>
 #include <cuda.h>
 #include <cuda_fp16.h>
-#include <cuda_runtime.h>
 #include <cublas_v2.h>
-#include <cuda_fp16.h>
-#include <cuda_runtime.h>
+
 
 using namespace std;
 
@@ -52,8 +50,8 @@ __global__ void  grid_stride_test_vec4_load(scalar_t * x, scalar_t * y,
         #pragma unroll
         for (int i = 0; i < vec_size; i++) {
             scalar_z[i] = scalar_x[i] + scalar_y[i];
-            float tmp = __half2float(scalar_z[i]);
-            printf("z=%f\n", tmp);
+            // float tmp = __half2float(scalar_z[i]);
+            // printf("z=%f\n", tmp);
         }
         dst_z[tid] = vec_z;
     }
@@ -74,16 +72,16 @@ __global__ void  grid_stride_test_hadd2(scalar_t * x, scalar_t * y,
         half2 *scalar_z = reinterpret_cast<half2 *>(z);
         scalar_z[tid] = (scalar_x[tid] + scalar_y[tid]); // instead of __hadd2()
     
-        float2 tmp = __half22float2(scalar_z[tid]);
-        printf("%f\n", tmp.x);
+        // float2 tmp = __half22float2(scalar_z[tid]);
+        // printf("%f\n", tmp.x);
     }
 }
 
 
-#define T half
+#define T float
 int main(int argc, char* argv[]) {
     int     ret = (cudaError_t)0;  // which means success
-    size_t  N = 1<<11;
+    size_t  N = 1<<22 + 1;
     int     i = 0, j = 0;
     size_t  byte_num = N * sizeof(T);
     int threads = 256;
@@ -107,15 +105,17 @@ int main(int argc, char* argv[]) {
     }
     cudaMemcpy((void *)(x.p_gpu), (void *)(x.p_cpu), byte_num, cudaMemcpyHostToDevice);
     cudaMemcpy((void *)(y.p_gpu), (void *)(y.p_cpu), byte_num, cudaMemcpyHostToDevice);
-
-    switch (test_case) {
-        case 0 : {
-            grid_stride_test_hadd2<T, 4><<<blocks>>3, threads>>>(x.p_gpu, y.p_gpu, z.p_gpu, N);
-            break;
-        }
-        case 1 : {
-            grid_stride_test_vec4_load<T, 4><<<blocks>>3, threads>>>(x.p_gpu, y.p_gpu, z.p_gpu, N);
-            break;
+    
+    for (int i = 0; i < 5000; i++) {
+        switch (test_case) {
+            case 0 : {
+                grid_stride_test_hadd2<T, 4><<<blocks>>3, threads>>>(x.p_gpu, y.p_gpu, z.p_gpu, N);
+                break;
+            }
+            case 1 : {
+                grid_stride_test_vec4_load<T, 4><<<blocks>>3, threads>>>(x.p_gpu, y.p_gpu, z.p_gpu, N);
+                break;
+            }
         }
     }
     cudaMemcpy((void *)(z.p_cpu), (void *)(z.p_gpu), byte_num, cudaMemcpyDeviceToHost);
